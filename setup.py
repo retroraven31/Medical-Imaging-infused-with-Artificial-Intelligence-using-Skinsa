@@ -1,0 +1,29 @@
+from setuptools import setup, find_packages
+
+setup(
+    name="skinsa",
+    version="0.1.0",
+    packages=find_packages(),
+    install_requires=[
+        "tensorflow>=2.16.0",
+        "keras>=3.0.0",
+        "numpy>=1.26.0",
+        "pandas>=2.0.0",
+        "scikit-learn>=1.3.0",
+        "scipy>=1.11.0",
+        "matplotlib>=3.8.0",
+        "pillow>=10.0.0",
+        "fastapi>=0.100.0",
+        "uvicorn>=0.23.0",
+        "jinja2>=3.1.0",
+        "python-multipart>=0.0.9",
+    ],
+    extras_require={
+        "test": ["pytest>=7.4.0", "pytest-cov>=4.1.0"],
+    },
+    entry_points={
+        "console_scripts": [
+            "skinsa=skinsa.cli:main",
+        ],
+    },
+)
