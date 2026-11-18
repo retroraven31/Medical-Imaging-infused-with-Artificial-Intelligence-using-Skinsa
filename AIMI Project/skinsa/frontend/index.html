@@ -1,0 +1,926 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>skinsa — Skin Lesion Classifier</title>
+<style>
+  /* ───────── Reset & Base ───────── */
+  *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+  :root{
+    --bg:#0F172A;--surface:#1E293B;--surface2:#334155;--surface3:#475569;
+    --primary:#38BDF8;--accent:#818CF8;--success:#34D399;--warning:#FBBF24;
+    --danger:#F87171;--text:#F1F5F9;--text2:#94A3B8;--border:#334155;
+    --card:#1E293B;--radius:12px;--shadow:0 4px 24px rgba(0,0,0,.4);
+    --font-mono:'JetBrains Mono',monospace;
+  }
+  html{scroll-behavior:smooth}
+  body{font-family:'Inter',system-ui,sans-serif;background:var(--bg);color:var(--text);min-height:100vh;overflow-x:hidden}
+  a{color:var(--primary);text-decoration:none}
+  a:hover{text-decoration:underline}
+  img{max-width:100%}
+  button{cursor:pointer;border:none;outline:none;font-family:inherit}
+  input,select,textarea{font-family:inherit;outline:none;border:none}
+
+  /* ───────── Typography ───────── */
+  h1{font-size:2rem;font-weight:800;line-height:1.2}
+  h2{font-size:1.4rem;font-weight:700;line-height:1.3}
+  h3{font-size:1.1rem;font-weight:600}
+  .mono{font-family:var(--font-mono);font-size:.85em}
+
+  /* ───────── Layout ───────── */
+  .container{max-width:1200px;margin:0 auto;padding:0 20px}
+  .grid-2{display:grid;grid-template-columns:1fr 1fr;gap:24px}
+  .grid-3{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
+  @media(max-width:900px){.grid-2,.grid-3{grid-template-columns:1fr}}
+
+  /* ───────── Navbar ───────── */
+  .navbar{background:linear-gradient(135deg,#1E3A5F 0%,#1E293B 100%);border-bottom:1px solid var(--border);padding:0 24px;position:sticky;top:0;z-index:100;backdrop-filter:blur(12px)}
+  .nav-inner{max-width:1200px;margin:0 auto;display:flex;align-items:center;gap:24px;height:62px}
+  .nav-brand{display:flex;align-items:center;gap:10px;font-size:1.3rem;font-weight:800;color:var(--text);letter-spacing:-.5px}
+  .nav-brand .badge{background:var(--primary);color:#0F172A;font-size:.6rem;font-weight:800;padding:2px 7px;border-radius:999px;letter-spacing:.5px;text-transform:uppercase}
+  .nav-tabs{display:flex;gap:4px;margin-left:auto}
+  .nav-tab{padding:7px 16px;border-radius:8px;font-size:.88rem;font-weight:600;color:var(--text2);transition:all .2s;cursor:pointer;background:transparent;border:none}
+  .nav-tab:hover{background:var(--surface2);color:var(--text)}
+  .nav-tab.active{background:var(--primary);color:#0F172A}
+  .nav-pill{background:rgba(56,189,248,.12);color:var(--primary);padding:3px 10px;border-radius:999px;font-size:.72rem;font-weight:700;border:1px solid rgba(56,189,248,.25)}
+
+  /* ───────── Hero ───────── */
+  .hero{background:linear-gradient(135deg,rgba(56,189,248,.08) 0%,rgba(129,140,248,.08) 100%);border-bottom:1px solid var(--border);padding:52px 24px 44px}
+  .hero-inner{max-width:1200px;margin:0 auto;display:flex;gap:48px;align-items:center}
+  .hero-text h1{background:linear-gradient(135deg,var(--primary),var(--accent));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;margin-bottom:12px}
+  .hero-text p{color:var(--text2);font-size:1.05rem;line-height:1.65;max-width:560px;margin-bottom:20px}
+  .hero-tags{display:flex;flex-wrap:wrap;gap:8px}
+  .hero-tag{background:var(--surface2);color:var(--text2);padding:4px 12px;border-radius:999px;font-size:.78rem;font-weight:600;border:1px solid var(--border)}
+  .hero-tag.primary{background:rgba(56,189,248,.12);color:var(--primary);border-color:rgba(56,189,248,.3)}
+  .hero-stats{display:flex;gap:16px;flex-wrap:wrap}
+  .stat-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:16px 22px;text-align:center;min-width:120px}
+  .stat-card .stat-value{font-size:1.6rem;font-weight:800;color:var(--primary)}
+  .stat-card .stat-label{font-size:.75rem;color:var(--text2);font-weight:500;margin-top:4px}
+
+  /* ───────── Cards ───────── */
+  .card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:24px;box-shadow:var(--shadow)}
+  .card-header{display:flex;align-items:center;gap:10px;margin-bottom:20px;padding-bottom:14px;border-bottom:1px solid var(--border)}
+  .card-title{font-size:1rem;font-weight:700}
+  .card-icon{width:36px;height:36px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:1.1rem;flex-shrink:0}
+
+  /* ───────── Tabs Content ───────── */
+  .tab-pane{display:none;padding:28px 0}
+  .tab-pane.active{display:block}
+
+  /* ───────── Diagnosis Panel ───────── */
+  .upload-zone{border:2px dashed var(--border);border-radius:var(--radius);padding:40px 24px;text-align:center;cursor:pointer;transition:all .3s;background:var(--surface);position:relative;overflow:hidden}
+  .upload-zone:hover,.upload-zone.dragover{border-color:var(--primary);background:rgba(56,189,248,.05)}
+  .upload-zone input[type=file]{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%}
+  .upload-icon{font-size:3rem;margin-bottom:12px;color:var(--text2)}
+  .upload-label{font-size:1rem;font-weight:600;color:var(--text);margin-bottom:6px}
+  .upload-hint{font-size:.82rem;color:var(--text2)}
+  .upload-preview{display:none;position:relative;border-radius:10px;overflow:hidden}
+  .upload-preview img{width:100%;height:280px;object-fit:cover;border-radius:10px}
+  .upload-preview .change-btn{position:absolute;bottom:10px;right:10px;background:rgba(0,0,0,.7);color:#fff;padding:6px 14px;border-radius:8px;font-size:.8rem;font-weight:600;border:none;cursor:pointer;backdrop-filter:blur(8px)}
+
+  /* Metadata form */
+  .meta-form{display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px;margin-top:16px}
+  @media(max-width:600px){.meta-form{grid-template-columns:1fr 1fr}}
+  .form-group label{display:block;font-size:.8rem;font-weight:600;color:var(--text2);margin-bottom:6px;text-transform:uppercase;letter-spacing:.5px}
+  .form-group input,.form-group select{width:100%;background:var(--surface2);border:1px solid var(--border);color:var(--text);padding:10px 14px;border-radius:8px;font-size:.9rem;transition:border .2s}
+  .form-group input:focus,.form-group select:focus{border-color:var(--primary)}
+  .form-group select option{background:var(--surface2)}
+
+  /* Buttons */
+  .btn{display:inline-flex;align-items:center;gap:8px;padding:12px 24px;border-radius:10px;font-size:.93rem;font-weight:700;transition:all .2s;border:none;cursor:pointer}
+  .btn-primary{background:linear-gradient(135deg,var(--primary),#0EA5E9);color:#0F172A}
+  .btn-primary:hover{filter:brightness(1.1);transform:translateY(-1px)}
+  .btn-secondary{background:var(--surface2);color:var(--text);border:1px solid var(--border)}
+  .btn-secondary:hover{background:var(--surface3)}
+  .btn-success{background:linear-gradient(135deg,var(--success),#059669);color:#0F172A}
+  .btn-danger{background:linear-gradient(135deg,var(--danger),#DC2626);color:#fff}
+  .btn:disabled{opacity:.45;cursor:not-allowed;transform:none}
+
+  /* Results Panel */
+  .result-container{display:none}
+  .result-container.show{display:block}
+  .result-top{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:20px 24px;margin-bottom:20px}
+  .prediction-badge{display:inline-flex;align-items:center;gap:8px;padding:8px 18px;border-radius:999px;font-size:1.1rem;font-weight:800;margin-bottom:12px;background:rgba(56,189,248,.12);border:2px solid var(--primary)}
+  .prediction-badge.high-risk{background:rgba(248,113,113,.12);border-color:var(--danger)}
+  .prediction-badge.critical-risk{background:rgba(220,38,38,.15);border-color:#DC2626}
+  .conf-bar-wrap{margin:8px 0}
+  .conf-bar-label{font-size:.8rem;color:var(--text2);margin-bottom:4px}
+  .conf-bar{height:8px;border-radius:999px;background:var(--surface2)}
+  .conf-bar-fill{height:100%;border-radius:999px;background:linear-gradient(90deg,var(--primary),var(--accent));transition:width 1s ease}
+
+  /* Prob bars */
+  .prob-list{display:flex;flex-direction:column;gap:10px}
+  .prob-item{display:flex;align-items:center;gap:10px}
+  .prob-label{width:80px;font-size:.8rem;font-weight:600;color:var(--text2);flex-shrink:0}
+  .prob-bar-wrap{flex:1;height:28px;background:var(--surface2);border-radius:8px;position:relative;overflow:hidden}
+  .prob-bar-fill{position:absolute;inset-y:0;left:0;border-radius:8px;transition:width 1.2s ease}
+  .prob-bar-pct{position:absolute;right:8px;top:50%;transform:translateY(-50%);font-size:.78rem;font-weight:700;color:#fff;mix-blend-mode:difference;z-index:1}
+
+  /* Heatmap panel */
+  .heatmap-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+  .heatmap-panel{text-align:center}
+  .heatmap-panel img{width:100%;height:220px;object-fit:cover;border-radius:10px;border:1px solid var(--border)}
+  .heatmap-label{font-size:.8rem;color:var(--text2);margin-top:6px;font-weight:600}
+
+  /* Alert box */
+  .alert{padding:14px 18px;border-radius:10px;font-size:.88rem;line-height:1.5;border:1px solid;margin-bottom:16px;display:flex;gap:10px;align-items:flex-start}
+  .alert-warning{background:rgba(251,191,36,.08);border-color:rgba(251,191,36,.4);color:var(--warning)}
+  .alert-info{background:rgba(56,189,248,.08);border-color:rgba(56,189,248,.3);color:var(--primary)}
+  .alert-danger{background:rgba(248,113,113,.08);border-color:rgba(248,113,113,.3);color:var(--danger)}
+  .alert-success{background:rgba(52,211,153,.08);border-color:rgba(52,211,153,.3);color:var(--success)}
+
+  /* ───────── Results Tab ───────── */
+  .metrics-table{width:100%;border-collapse:collapse}
+  .metrics-table th,.metrics-table td{padding:12px 16px;text-align:left;border-bottom:1px solid var(--border);font-size:.9rem}
+  .metrics-table th{color:var(--text2);font-size:.78rem;font-weight:700;text-transform:uppercase;letter-spacing:.5px}
+  .metrics-table td:first-child{font-weight:700}
+  .metrics-table .pending{color:var(--warning);font-size:.8rem}
+  .metrics-table .real{color:var(--success);font-weight:700}
+  .metrics-table tr:last-child td{border-bottom:none}
+  .metrics-table tr:hover td{background:rgba(255,255,255,.02)}
+
+  /* Upload results */
+  .results-upload{border:2px dashed var(--border);border-radius:var(--radius);padding:32px 24px;text-align:center;background:var(--surface);position:relative}
+  .results-upload input[type=file]{position:absolute;inset:0;opacity:0;cursor:pointer}
+  .results-upload:hover{border-color:var(--accent);background:rgba(129,140,248,.04)}
+
+  /* ───────── Architecture Tab ───────── */
+  .arch-flow{display:flex;flex-direction:column;gap:4px;padding:16px 0}
+  .arch-block{background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:14px 18px;display:flex;justify-content:space-between;align-items:center}
+  .arch-block.highlight{border-color:var(--primary);background:rgba(56,189,248,.07)}
+  .arch-block.attention-block{border-color:var(--accent);background:rgba(129,140,248,.08)}
+  .arch-name{font-weight:700;font-size:.9rem}
+  .arch-shape{font-family:var(--font-mono);font-size:.78rem;color:var(--text2)}
+  .arch-params{font-size:.75rem;color:var(--text2);font-weight:600}
+  .arch-arrow{text-align:center;font-size:1.2rem;color:var(--text2);padding:2px 0}
+
+  /* ───────── Spinner ───────── */
+  .spinner{display:inline-block;width:20px;height:20px;border:3px solid rgba(255,255,255,.2);border-top-color:var(--primary);border-radius:50%;animation:spin .7s linear infinite}
+  @keyframes spin{to{transform:rotate(360deg)}}
+
+  /* ───────── Toast ───────── */
+  #toast-container{position:fixed;bottom:24px;right:24px;z-index:999;display:flex;flex-direction:column;gap:10px}
+  .toast{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:14px 20px;font-size:.88rem;box-shadow:var(--shadow);display:flex;align-items:center;gap:10px;min-width:260px;animation:slideUp .3s ease}
+  @keyframes slideUp{from{transform:translateY(20px);opacity:0}to{transform:translateY(0);opacity:1}}
+  .toast.success{border-left:4px solid var(--success)}
+  .toast.error{border-left:4px solid var(--danger)}
+  .toast.info{border-left:4px solid var(--primary)}
+
+  /* ───────── Misc utils ───────── */
+  .section-gap{padding:28px 0}
+  .mb-16{margin-bottom:16px}
+  .mb-24{margin-bottom:24px}
+  .text-muted{color:var(--text2)}
+  .badge-pill{display:inline-flex;align-items:center;padding:3px 10px;border-radius:999px;font-size:.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.4px}
+  .badge-success{background:rgba(52,211,153,.12);color:var(--success);border:1px solid rgba(52,211,153,.3)}
+  .badge-warning{background:rgba(251,191,36,.12);color:var(--warning);border:1px solid rgba(251,191,36,.3)}
+  .badge-danger{background:rgba(248,113,113,.12);color:var(--danger);border:1px solid rgba(248,113,113,.3)}
+  .badge-info{background:rgba(56,189,248,.12);color:var(--primary);border:1px solid rgba(56,189,248,.3)}
+  .text-right{text-align:right}
+  .footer{text-align:center;padding:28px 24px;color:var(--text2);font-size:.8rem;border-top:1px solid var(--border);margin-top:48px}
+  .loading-overlay{position:fixed;inset:0;background:rgba(15,23,42,.85);z-index:500;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;backdrop-filter:blur(6px)}
+  .loading-overlay.hidden{display:none}
+
+  /* ───────── Dataset Dist chart ───────── */
+  .dist-bar-row{display:flex;align-items:center;gap:12px;margin-bottom:10px}
+  .dist-class{width:60px;font-size:.82rem;font-weight:700;text-align:right;flex-shrink:0}
+  .dist-bar-container{flex:1;background:var(--surface2);border-radius:999px;height:26px;position:relative;overflow:hidden}
+  .dist-bar-fill{height:100%;border-radius:999px;display:flex;align-items:center;padding:0 10px;font-size:.75rem;font-weight:700;color:#fff;white-space:nowrap;transition:width 1.5s ease}
+  .dist-count{font-size:.78rem;color:var(--text2);width:90px;text-align:left;flex-shrink:0}
+
+  /* ─── Compare Table Styles ─── */
+  .compare-metric{font-size:.85rem;font-weight:600;color:var(--text2);text-transform:uppercase;letter-spacing:.5px}
+  .compare-paper{color:var(--warning)}
+  .compare-replicated{color:var(--primary)}
+  .compare-enhanced{color:var(--success)}
+</style>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+</head>
+<body>
+
+<!-- ══════════════ NAVBAR ══════════════ -->
+<nav class="navbar">
+  <div class="nav-inner">
+    <div class="nav-brand">
+      🔬 <span>skinsa</span>
+      <span class="badge">Research</span>
+    </div>
+    <div class="nav-tabs">
+      <button class="nav-tab active" onclick="switchTab('diagnose')">🩺 Diagnose</button>
+      <button class="nav-tab" onclick="switchTab('results')">📊 Results</button>
+      <button class="nav-tab" onclick="switchTab('architecture')">🏗 Architecture</button>
+      <button class="nav-tab" onclick="switchTab('dataset')">📁 Dataset</button>
+    </div>
+    <select id="backboneSelector" style="background:var(--surface2);color:var(--text);border:1px solid var(--border);padding:7px 12px;border-radius:8px;font-size:.82rem;font-weight:600;cursor:pointer" onchange="setBackbone(this.value)">
+      <option value="mobilenet_v3_large">MobileNetV3Large</option>
+      <option value="densenet201">DenseNet201</option>
+    </select>
+  </div>
+</nav>
+
+<!-- ══════════════ HERO ══════════════ -->
+<section class="hero">
+  <div class="hero-inner">
+    <div class="hero-text">
+      <h1>Skin Lesion Classification<br>with Soft Attention</h1>
+      <p>Replication of <strong>Nguyen et al., Sensors 2022</strong> — classifying HAM10000 dermoscopy images
+      (10,015 samples, 7 classes) using deep learning + Conv3D soft-attention, metadata fusion, and class-weighted training.</p>
+      <div class="hero-tags">
+        <span class="hero-tag primary">📄 Sensors 2022</span>
+        <span class="hero-tag">TensorFlow 2.21</span>
+        <span class="hero-tag">Keras 3</span>
+        <span class="hero-tag">MobileNetV3Large</span>
+        <span class="hero-tag">DenseNet201</span>
+        <span class="hero-tag">HAM10000</span>
+      </div>
+    </div>
+    <div class="hero-stats">
+      <div class="stat-card">
+        <div class="stat-value">10,015</div>
+        <div class="stat-label">Total Images</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value">7</div>
+        <div class="stat-label">Classes</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value">67%</div>
+        <div class="stat-label">Nevus (NV)</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value">16</div>
+        <div class="stat-label">Attn Heads</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<div class="container">
+
+<!-- ══════════════ TAB: DIAGNOSE ══════════════ -->
+<div id="tab-diagnose" class="tab-pane active">
+  <div class="section-gap">
+
+    <div class="alert alert-warning">
+      <span>⚠️</span>
+      <div>
+        <strong>Research Prototype.</strong> This app uses randomly-initialized weights — predictions are not clinically meaningful.
+        Real metrics require GPU training on HAM10000 (see Results tab). Never use for medical decisions.
+      </div>
+    </div>
+
+    <div class="grid-2">
+
+      <!-- LEFT: Upload -->
+      <div>
+        <div class="card mb-24">
+          <div class="card-header">
+            <div class="card-icon" style="background:rgba(56,189,248,.12);color:var(--primary)">📷</div>
+            <span class="card-title">Dermoscopy Image</span>
+          </div>
+
+          <div class="upload-zone" id="uploadZone" ondragover="handleDragOver(event)" ondragleave="handleDragLeave(event)" ondrop="handleDrop(event)">
+            <input type="file" id="imageInput" accept="image/*" onchange="handleImageSelect(event)" />
+            <div id="uploadPlaceholder">
+              <div class="upload-icon">🖼️</div>
+              <div class="upload-label">Drop a dermoscopy image here</div>
+              <div class="upload-hint">or click to browse — JPG, PNG, TIFF accepted</div>
+            </div>
+            <div class="upload-preview" id="uploadPreview">
+              <img id="previewImg" src="" alt="Preview" />
+              <button class="change-btn" onclick="clearImage()">Change Image</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Metadata -->
+        <div class="card mb-24">
+          <div class="card-header">
+            <div class="card-icon" style="background:rgba(129,140,248,.12);color:var(--accent)">👤</div>
+            <span class="card-title">Patient Metadata <span style="font-size:.75rem;font-weight:400;color:var(--text2)">(21 features)</span></span>
+          </div>
+          <div class="meta-form">
+            <div class="form-group">
+              <label>Age (years)</label>
+              <input type="number" id="metaAge" min="0" max="120" placeholder="e.g. 45" />
+            </div>
+            <div class="form-group">
+              <label>Biological Sex</label>
+              <select id="metaSex">
+                <option value="unknown">Unknown</option>
+                <option value="male">Male</option>
+                <option value="female">Female</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label>Body Location</label>
+              <select id="metaLoc">
+                <option value="unknown">Unknown</option>
+                <option value="abdomen">Abdomen</option>
+                <option value="acral">Acral</option>
+                <option value="back">Back</option>
+                <option value="chest">Chest</option>
+                <option value="ear">Ear</option>
+                <option value="face">Face</option>
+                <option value="foot">Foot</option>
+                <option value="genital">Genital</option>
+                <option value="hand">Hand</option>
+                <option value="lower extremity">Lower Extremity</option>
+                <option value="neck">Neck</option>
+                <option value="scalp">Scalp</option>
+                <option value="trunk">Trunk</option>
+                <option value="upper extremity">Upper Extremity</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
+        <button class="btn btn-primary" id="diagnoseBtn" onclick="runDiagnosis()" style="width:100%;justify-content:center;font-size:1rem;padding:14px" disabled>
+          <span id="diagnoseBtnText">🔍 Select an image to diagnose</span>
+        </button>
+      </div>
+
+      <!-- RIGHT: Results -->
+      <div>
+        <div id="resultContainer" class="result-container">
+
+          <!-- Prediction header -->
+          <div class="card mb-24" id="predictionCard">
+            <div class="card-header">
+              <div class="card-icon" style="background:rgba(52,211,153,.12);color:var(--success)">✅</div>
+              <span class="card-title">Diagnosis Result</span>
+              <span id="inferenceTimeDisplay" class="mono text-muted" style="margin-left:auto;font-size:.8rem"></span>
+            </div>
+
+            <div id="predictionBadge" class="prediction-badge">
+              <span id="predictionEmoji">🔵</span>
+              <span id="predictionClass">—</span>
+            </div>
+            <div id="predictionFullName" style="font-size:.88rem;color:var(--text2);margin-bottom:12px"></div>
+
+            <div class="conf-bar-wrap">
+              <div class="conf-bar-label">Confidence: <strong id="confValue">—</strong></div>
+              <div class="conf-bar">
+                <div class="conf-bar-fill" id="confBarFill" style="width:0%"></div>
+              </div>
+            </div>
+
+            <div style="display:flex;gap:10px;margin-top:14px;flex-wrap:wrap">
+              <span id="riskBadge" class="badge-pill">—</span>
+              <span id="categoryBadge" class="badge-pill badge-info">—</span>
+            </div>
+          </div>
+
+          <!-- Heatmap -->
+          <div class="card mb-24">
+            <div class="card-header">
+              <div class="card-icon" style="background:rgba(251,191,36,.12);color:var(--warning)">🔥</div>
+              <span class="card-title">Soft-Attention Heatmap</span>
+            </div>
+            <div class="heatmap-grid" id="heatmapGrid">
+              <div class="heatmap-panel">
+                <img id="origImageDisplay" src="" alt="Original" />
+                <div class="heatmap-label">📷 Original Image</div>
+              </div>
+              <div class="heatmap-panel">
+                <img id="heatmapDisplay" src="" alt="Attention Heatmap" />
+                <div class="heatmap-label">🔥 Attention Overlay</div>
+              </div>
+            </div>
+            <div id="noHeatmapMsg" class="text-muted" style="font-size:.82rem;text-align:center;padding:16px 0;display:none">
+              Heatmap unavailable — requires loaded model weights
+            </div>
+          </div>
+
+          <!-- Per-class probabilities -->
+          <div class="card">
+            <div class="card-header">
+              <div class="card-icon" style="background:rgba(129,140,248,.12);color:var(--accent)">📊</div>
+              <span class="card-title">Class Probabilities</span>
+            </div>
+            <div class="prob-list" id="probList"></div>
+          </div>
+        </div>
+
+        <!-- Placeholder when no result -->
+        <div id="noResultPlaceholder" class="card" style="text-align:center;padding:60px 24px;color:var(--text2)">
+          <div style="font-size:4rem;margin-bottom:16px">🩻</div>
+          <div style="font-size:1rem;font-weight:600;margin-bottom:8px">No Diagnosis Yet</div>
+          <div style="font-size:.85rem">Upload a dermoscopy image and click Diagnose</div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════ TAB: RESULTS ══════════════ -->
+<div id="tab-results" class="tab-pane">
+  <div class="section-gap">
+    <div class="alert alert-info">
+      <span>ℹ️</span>
+      <div>
+        Real training metrics require GPU execution on HAM10000. Upload a <code>results_bundle.zip</code>
+        from a completed Colab T4 run to populate this table. All values are <strong>PENDING</strong> until then.
+      </div>
+    </div>
+
+    <!-- Upload Results -->
+    <div class="card mb-24">
+      <div class="card-header">
+        <div class="card-icon" style="background:rgba(129,140,248,.12);color:var(--accent)">📤</div>
+        <span class="card-title">Upload GPU Results</span>
+      </div>
+      <div class="results-upload" id="resultsUploadZone">
+        <input type="file" accept=".zip" onchange="uploadResults(event)" />
+        <div style="font-size:2.5rem;margin-bottom:12px">📦</div>
+        <div style="font-size:.95rem;font-weight:600;margin-bottom:6px">Drop <code>results_bundle.zip</code> here</div>
+        <div style="font-size:.82rem;color:var(--text2)">Produced by <code>skinsa --protocol paper</code> or <code>skinsa --protocol lesion</code></div>
+      </div>
+    </div>
+
+    <!-- Comparison Table -->
+    <div class="card">
+      <div class="card-header">
+        <div class="card-icon" style="background:rgba(52,211,153,.12);color:var(--success)">📈</div>
+        <span class="card-title">Comparison Table — <span id="backboneLabel">MobileNetV3Large</span></span>
+      </div>
+      <table class="metrics-table" id="comparisonTable">
+        <thead>
+          <tr>
+            <th>Metric</th>
+            <th class="compare-paper">📄 Paper (Reported)</th>
+            <th class="compare-replicated">🔵 Replicated (Baseline)</th>
+            <th class="compare-enhanced">🟢 Enhanced (Lesion+TTA)</th>
+          </tr>
+        </thead>
+        <tbody id="compTableBody">
+          <!-- Populated by JS -->
+        </tbody>
+      </table>
+      <div style="margin-top:16px;font-size:.8rem;color:var(--text2)">
+        🔴 PENDING = Not yet produced. Run on GPU and upload <code>results_bundle.zip</code>.
+      </div>
+    </div>
+
+    <!-- Training Run Instructions -->
+    <div class="card" style="margin-top:24px">
+      <div class="card-header">
+        <div class="card-icon" style="background:rgba(251,191,36,.12);color:var(--warning)">🚀</div>
+        <span class="card-title">How to Get Real Results</span>
+      </div>
+      <div style="font-size:.88rem;line-height:1.9;color:var(--text2)">
+        <ol style="padding-left:20px;display:flex;flex-direction:column;gap:8px">
+          <li>Download <strong>HAM10000</strong> from <a href="https://www.kaggle.com/datasets/kmader/skin-cancer-mnist-ham10000" target="_blank">Kaggle</a> (1.9 GB)</li>
+          <li>Open the Colab notebook: <code>notebooks/skinsa_colab.ipynb</code></li>
+          <li>Run: <code>skinsa --protocol paper --backbone mobilenet_v3_large</code> on a Colab T4</li>
+          <li>Download the generated <code>outputs/results_bundle.zip</code></li>
+          <li>Upload it here using the box above</li>
+          <li>For the enhanced protocol: <code>skinsa --protocol lesion --backbone mobilenet_v3_large</code></li>
+        </ol>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════ TAB: ARCHITECTURE ══════════════ -->
+<div id="tab-architecture" class="tab-pane">
+  <div class="section-gap">
+    <div class="grid-2">
+      <div>
+        <div class="card">
+          <div class="card-header">
+            <div class="card-icon" style="background:rgba(56,189,248,.12);color:var(--primary)">🏗</div>
+            <span class="card-title">Model Architecture Flow</span>
+          </div>
+          <div class="arch-flow" id="archFlow">
+            <!-- Populated by JS -->
+          </div>
+        </div>
+      </div>
+      <div>
+        <div class="card mb-24">
+          <div class="card-header">
+            <div class="card-icon" style="background:rgba(129,140,248,.12);color:var(--accent)">📐</div>
+            <span class="card-title">Soft-Attention Layer Detail</span>
+          </div>
+          <div style="font-size:.88rem;line-height:2;color:var(--text2)">
+            <table style="width:100%;font-size:.85rem">
+              <tr><td style="padding:4px 0;color:var(--text);font-weight:600">Layout</td><td>Conv3D on 5D volume</td></tr>
+              <tr><td style="padding:4px 0;color:var(--text);font-weight:600">Kernel shape</td><td class="mono">(C, 3, 3, 1, 16)</td></tr>
+              <tr><td style="padding:4px 0;color:var(--text);font-weight:600">Stride</td><td class="mono">(C, 1, 1)</td></tr>
+              <tr><td style="padding:4px 0;color:var(--text);font-weight:600">Padding</td><td>SAME (manual pad H,W)</td></tr>
+              <tr><td style="padding:4px 0;color:var(--text);font-weight:600">Input reshape</td><td class="mono">(B,C,H,W,1)</td></tr>
+              <tr><td style="padding:4px 0;color:var(--text);font-weight:600">Attn normalization</td><td>Spatial softmax per head</td></tr>
+              <tr><td style="padding:4px 0;color:var(--text);font-weight:600">Learnable gamma</td><td>❌ None (paper design)</td></tr>
+              <tr><td style="padding:4px 0;color:var(--text);font-weight:600">Params (MNV3)</td><td class="mono">138,256</td></tr>
+              <tr><td style="padding:4px 0;color:var(--text);font-weight:600">Params (DN201)</td><td class="mono">18,448</td></tr>
+            </table>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-header">
+            <div class="card-icon" style="background:rgba(52,211,153,.12);color:var(--success)">📋</div>
+            <span class="card-title">Training Configuration</span>
+          </div>
+          <div style="font-size:.85rem;line-height:2;color:var(--text2)">
+            <table style="width:100%">
+              <tr><td style="color:var(--text);font-weight:600;padding:4px 0">Optimizer</td><td>Adam (lr=1e-3, ε=0.1)</td></tr>
+              <tr><td style="color:var(--text);font-weight:600;padding:4px 0">Loss</td><td>Class-weighted CE</td></tr>
+              <tr><td style="color:var(--text);font-weight:600;padding:4px 0">Weights formula</td><td class="mono">w_i = N / (C × N_i)</td></tr>
+              <tr><td style="color:var(--text);font-weight:600;padding:4px 0">Batch size</td><td>32</td></tr>
+              <tr><td style="color:var(--text);font-weight:600;padding:4px 0">Max epochs</td><td>250</td></tr>
+              <tr><td style="color:var(--text);font-weight:600;padding:4px 0">LR Reduction</td><td>×0.2, patience=10</td></tr>
+              <tr><td style="color:var(--text);font-weight:600;padding:4px 0">Early Stop</td><td>val_accuracy, patience=25</td></tr>
+              <tr><td style="color:var(--text);font-weight:600;padding:4px 0">Image size</td><td>224×224</td></tr>
+              <tr><td style="color:var(--text);font-weight:600;padding:4px 0">Metadata dim</td><td>21 features</td></tr>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════ TAB: DATASET ══════════════ -->
+<div id="tab-dataset" class="tab-pane">
+  <div class="section-gap">
+    <div class="grid-2">
+      <div>
+        <div class="card">
+          <div class="card-header">
+            <div class="card-icon" style="background:rgba(251,191,36,.12);color:var(--warning)">📊</div>
+            <span class="card-title">HAM10000 Class Distribution</span>
+          </div>
+          <div id="distributionChart">
+            <!-- Populated by JS -->
+          </div>
+        </div>
+      </div>
+      <div>
+        <div class="card mb-24">
+          <div class="card-header">
+            <div class="card-icon" style="background:rgba(248,113,113,.12);color:var(--danger)">⚡</div>
+            <span class="card-title">The Imbalance Challenge</span>
+          </div>
+          <div style="font-size:.88rem;line-height:1.75;color:var(--text2)">
+            <p style="margin-bottom:12px">The HAM10000 dataset exhibits extreme class imbalance. The <strong style="color:var(--text)">Melanocytic Nevi (NV)</strong> class accounts for <strong style="color:var(--warning)">~67%</strong> of all samples (6,705 images), while rare classes like <strong style="color:var(--text)">Vascular Lesions (VASC)</strong> have only 142 samples — a <strong style="color:var(--danger)">47:1 imbalance ratio</strong>.</p>
+            <p style="margin-bottom:12px">Without correction, a naive model could achieve <strong style="color:var(--text)">67% accuracy by always predicting NV</strong>, while failing completely on the clinically important melanoma class.</p>
+            <p>The paper addresses this via <strong style="color:var(--text)">class-weighted cross-entropy</strong>:</p>
+            <div style="background:var(--surface2);border-radius:8px;padding:12px 16px;margin-top:8px;font-family:var(--font-mono);font-size:.85rem;color:var(--primary)">w_i = N / (C × N_i)</div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-header">
+            <div class="card-icon" style="background:rgba(52,211,153,.12);color:var(--success)">🔄</div>
+            <span class="card-title">Experiment Protocols</span>
+          </div>
+          <div style="font-size:.88rem;line-height:1.75;color:var(--text2)">
+            <div style="margin-bottom:14px">
+              <div style="font-weight:700;color:var(--text);margin-bottom:4px">📄 Paper Protocol (--protocol paper)</div>
+              <div>Stratified random 90/10 split at image level. Replicates the authors' evaluation exactly. Risk of data leakage if same lesion appears in both splits.</div>
+            </div>
+            <div>
+              <div style="font-weight:700;color:var(--text);margin-bottom:4px">🔬 Lesion Protocol (--protocol lesion)</div>
+              <div>StratifiedGroupKFold(10) grouped by <code>lesion_id</code>. Creates 80/10/10 split. Guarantees zero lesion leakage. Test set evaluated with <strong>8-view Dihedral TTA</strong> (identity + 3 rotations × horizontal flip). Same trained weights for fair comparison.</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+</div><!-- /container -->
+
+<div class="footer">
+  <strong>skinsa</strong> v0.1.0 — Replication of Nguyen et al., <em>Sensors</em> 2022 · DOI: 10.3390/s22197530
+  <br>⚠️ Research prototype only — not for clinical use
+</div>
+
+<div id="toast-container"></div>
+<div class="loading-overlay hidden" id="loadingOverlay">
+  <div class="spinner" style="width:48px;height:48px;border-width:4px"></div>
+  <div style="font-size:1rem;font-weight:600;color:var(--text)" id="loadingText">Running Diagnosis...</div>
+</div>
+
+<script>
+const API = '';  // Same origin
+let selectedImageFile = null;
+
+// ══════════════ TAB SWITCHING ══════════════
+function switchTab(name) {
+  document.querySelectorAll('.tab-pane').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
+  document.getElementById('tab-' + name).classList.add('active');
+  event.currentTarget.classList.add('active');
+  if (name === 'results') loadResults();
+  if (name === 'architecture') loadArchitecture();
+  if (name === 'dataset') loadDataset();
+}
+
+// ══════════════ TOAST ══════════════
+function showToast(msg, type = 'info', duration = 4000) {
+  const container = document.getElementById('toast-container');
+  const toast = document.createElement('div');
+  const icons = { info: 'ℹ️', success: '✅', error: '❌' };
+  toast.className = `toast ${type}`;
+  toast.innerHTML = `<span>${icons[type] || 'ℹ️'}</span><span>${msg}</span>`;
+  container.appendChild(toast);
+  setTimeout(() => { toast.style.opacity = '0'; toast.style.transition = 'opacity .4s'; setTimeout(() => toast.remove(), 400); }, duration);
+}
+
+// ══════════════ IMAGE UPLOAD ══════════════
+function handleDragOver(e) { e.preventDefault(); document.getElementById('uploadZone').classList.add('dragover'); }
+function handleDragLeave(e) { document.getElementById('uploadZone').classList.remove('dragover'); }
+function handleDrop(e) {
+  e.preventDefault();
+  document.getElementById('uploadZone').classList.remove('dragover');
+  const file = e.dataTransfer.files[0];
+  if (file && file.type.startsWith('image/')) processFile(file);
+  else showToast('Please drop an image file', 'error');
+}
+function handleImageSelect(e) { const file = e.target.files[0]; if (file) processFile(file); }
+
+function processFile(file) {
+  selectedImageFile = file;
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    document.getElementById('previewImg').src = e.target.result;
+    document.getElementById('uploadPlaceholder').style.display = 'none';
+    document.getElementById('uploadPreview').style.display = 'block';
+    document.getElementById('diagnoseBtn').disabled = false;
+    document.getElementById('diagnoseBtnText').textContent = '🔍 Diagnose Image';
+    document.getElementById('noResultPlaceholder').style.display = 'none';
+  };
+  reader.readAsDataURL(file);
+}
+
+function clearImage() {
+  selectedImageFile = null;
+  document.getElementById('imageInput').value = '';
+  document.getElementById('previewImg').src = '';
+  document.getElementById('uploadPlaceholder').style.display = 'block';
+  document.getElementById('uploadPreview').style.display = 'none';
+  document.getElementById('diagnoseBtn').disabled = true;
+  document.getElementById('diagnoseBtnText').textContent = '🔍 Select an image to diagnose';
+  document.getElementById('resultContainer').classList.remove('show');
+  document.getElementById('noResultPlaceholder').style.display = 'block';
+}
+
+// ══════════════ DIAGNOSIS ══════════════
+async function runDiagnosis() {
+  if (!selectedImageFile) return;
+
+  document.getElementById('loadingOverlay').classList.remove('hidden');
+  document.getElementById('diagnoseBtn').disabled = true;
+
+  const formData = new FormData();
+  formData.append('image', selectedImageFile);
+  formData.append('age', document.getElementById('metaAge').value || '');
+  formData.append('sex', document.getElementById('metaSex').value);
+  formData.append('localization', document.getElementById('metaLoc').value);
+
+  try {
+    const res = await fetch('/api/diagnose', { method: 'POST', body: formData });
+    if (!res.ok) throw new Error(await res.text());
+    const data = await res.json();
+    renderResult(data);
+    showToast('Diagnosis complete', 'success');
+  } catch (err) {
+    showToast('Error: ' + err.message, 'error');
+  } finally {
+    document.getElementById('loadingOverlay').classList.add('hidden');
+    document.getElementById('diagnoseBtn').disabled = false;
+  }
+}
+
+function renderResult(data) {
+  const pred = data.prediction;
+  const riskMap = { Low: 'badge-success', High: 'badge-warning', Critical: 'badge-danger', 'Pre-malignant': 'badge-warning' };
+
+  // Prediction badge
+  const emojiMap = { nv: '🟢', mel: '🔴', bcc: '🟠', akiec: '🟡', bkl: '🔵', df: '🩵', vasc: '🟣' };
+  document.getElementById('predictionEmoji').textContent = emojiMap[pred.class] || '🔵';
+  document.getElementById('predictionClass').textContent = pred.class.toUpperCase();
+  document.getElementById('predictionFullName').textContent = pred.name;
+
+  const badge = document.getElementById('predictionBadge');
+  badge.className = 'prediction-badge';
+  if (pred.risk === 'High' || pred.risk === 'Critical') badge.classList.add('high-risk');
+  if (pred.risk === 'Critical') badge.classList.add('critical-risk');
+
+  // Confidence
+  document.getElementById('confValue').textContent = pred.confidence.toFixed(1) + '%';
+  document.getElementById('confBarFill').style.width = pred.confidence + '%';
+
+  // Risk/Category badges
+  const riskBadge = document.getElementById('riskBadge');
+  riskBadge.textContent = pred.risk + ' Risk';
+  riskBadge.className = 'badge-pill ' + (riskMap[pred.risk] || 'badge-info');
+  document.getElementById('categoryBadge').textContent = pred.category;
+
+  // Inference time
+  document.getElementById('inferenceTimeDisplay').textContent = data.inference_ms.toFixed(1) + 'ms';
+
+  // Heatmap
+  if (data.heatmap) {
+    document.getElementById('origImageDisplay').src = data.original_image;
+    document.getElementById('heatmapDisplay').src = data.heatmap;
+    document.getElementById('heatmapGrid').style.display = 'grid';
+    document.getElementById('noHeatmapMsg').style.display = 'none';
+  } else {
+    document.getElementById('origImageDisplay').src = data.original_image;
+    document.getElementById('heatmapDisplay').src = data.original_image;
+    document.getElementById('noHeatmapMsg').style.display = 'block';
+  }
+
+  // Probability bars
+  const probList = document.getElementById('probList');
+  probList.innerHTML = '';
+  data.probabilities.forEach(item => {
+    const pct = (item.probability * 100).toFixed(2);
+    const div = document.createElement('div');
+    div.className = 'prob-item';
+    div.innerHTML = `
+      <div class="prob-label">${item.class.toUpperCase()}</div>
+      <div class="prob-bar-wrap">
+        <div class="prob-bar-fill" style="width:${pct}%;background:${item.color}"></div>
+        <span class="prob-bar-pct">${pct}%</span>
+      </div>`;
+    probList.appendChild(div);
+  });
+
+  document.getElementById('resultContainer').classList.add('show');
+  document.getElementById('noResultPlaceholder').style.display = 'none';
+}
+
+// ══════════════ BACKBONE SELECTOR ══════════════
+async function setBackbone(value) {
+  const formData = new FormData();
+  formData.append('backbone', value);
+  const res = await fetch('/api/set-backbone', { method: 'POST', body: formData });
+  if (res.ok) {
+    showToast('Backbone set to: ' + value, 'success');
+    document.getElementById('backboneLabel').textContent = value === 'mobilenet_v3_large' ? 'MobileNetV3Large' : 'DenseNet201';
+    loadResults();
+    loadArchitecture();
+  }
+}
+
+// ══════════════ RESULTS TAB ══════════════
+async function loadResults() {
+  try {
+    const res = await fetch('/api/results');
+    const data = await res.json();
+    renderComparisonTable(data);
+  } catch (e) { }
+}
+
+function renderComparisonTable(data) {
+  const tbody = document.getElementById('compTableBody');
+  const metrics = [
+    { key: 'accuracy', label: 'Accuracy' },
+    { key: 'precision', label: 'Precision (macro)' },
+    { key: 'recall', label: 'Recall (macro)' },
+    { key: 'f1', label: 'F1 Score (macro)' },
+    { key: 'auc', label: 'AUC (macro OVR)' },
+    { key: 'execution_time_ms', label: 'Inference (ms/img)' },
+  ];
+
+  tbody.innerHTML = metrics.map(m => {
+    const paperVal = data.paper_metrics?.[m.key];
+    const repVal = data.replicated_metrics?.[m.key];
+    const enhVal = data.enhanced_metrics?.[m.key];
+
+    const fmt = v => v !== undefined && v !== null ? (m.key === 'execution_time_ms' ? v.toFixed(1) : (v * (m.key === 'execution_time_ms' ? 1 : 100)).toFixed(m.key === 'execution_time_ms' ? 1 : 2) + (m.key === 'execution_time_ms' ? '' : '%')) : null;
+    const fmtRaw = v => v !== undefined && v !== null ? (m.key === 'execution_time_ms' ? v.toFixed(1) + ' ms' : (v * 100).toFixed(2) + '%') : null;
+
+    const pStr = fmtRaw(paperVal) || '<span class="pending">🔴 N/A</span>';
+    const rStr = fmtRaw(repVal) || '<span class="pending">🔴 PENDING</span>';
+    const eStr = fmtRaw(enhVal) || '<span class="pending">🔴 PENDING</span>';
+
+    return `<tr>
+      <td class="compare-metric">${m.label}</td>
+      <td class="compare-paper">${pStr}</td>
+      <td class="compare-replicated">${rStr}</td>
+      <td class="compare-enhanced">${eStr}</td>
+    </tr>`;
+  }).join('');
+}
+
+// ══════════════ RESULTS UPLOAD ══════════════
+async function uploadResults(e) {
+  const file = e.target.files[0];
+  if (!file) return;
+
+  document.getElementById('loadingText').textContent = 'Uploading Results...';
+  document.getElementById('loadingOverlay').classList.remove('hidden');
+
+  const formData = new FormData();
+  formData.append('results_zip', file);
+  try {
+    const res = await fetch('/api/upload-results', { method: 'POST', body: formData });
+    if (res.ok) {
+      showToast('Results uploaded successfully!', 'success');
+      loadResults();
+    } else {
+      const err = await res.json();
+      showToast('Upload failed: ' + err.detail, 'error');
+    }
+  } catch (err) {
+    showToast('Upload error: ' + err.message, 'error');
+  } finally {
+    document.getElementById('loadingOverlay').classList.add('hidden');
+  }
+}
+
+// ══════════════ ARCHITECTURE TAB ══════════════
+async function loadArchitecture() {
+  try {
+    const res = await fetch('/api/architecture');
+    const data = await res.json();
+    renderArchFlow(data);
+  } catch (e) { }
+}
+
+function renderArchFlow(data) {
+  const C = data.feature_channels;
+  const HW = data.feature_hw || [7, 7];
+  const totalParams = (data.total_trainable_params || 0).toLocaleString();
+  const attnParams = (data.soft_attention_params || 0).toLocaleString();
+
+  const blocks = [
+    { name: 'Image Input', shape: `(B, 224, 224, 3)`, params: '', cls: '' },
+    { name: data.display_name + ' Backbone', shape: `cut at ${data.cut_layer}`, params: '', cls: 'highlight' },
+    { name: `Feature Map`, shape: `(B, ${HW[0]}, ${HW[1]}, ${C})`, params: ``, cls: 'highlight' },
+    { name: '16-Head Soft-Attention (Conv3D)', shape: `Kernel (${C},3,3,1,16) → Attn(B,${HW[0]},${HW[1]},1)`, params: attnParams + ' params', cls: 'attention-block' },
+    { name: 'Plain Map + Attended Map', shape: `both (B,${HW[0]},${HW[1]},${C})`, params: '', cls: '' },
+    { name: 'MaxPool2D (2×2)', shape: `→ (B, 4, 4, ${C}) × 2`, params: '', cls: '' },
+    { name: 'Concat → ReLU → Dropout(0.5) → Flatten', shape: `→ (B, ${4*4*2*C})`, params: '', cls: '' },
+    { name: 'Metadata Input (21 features)', shape: '(B, 21)', params: '', cls: '' },
+    { name: 'Dense(4096) Metadata Branch', shape: '→ (B, 4096)', params: '90,112 params', cls: '' },
+    { name: 'Fusion: Visual ‖ Metadata', shape: `(B, ${4*4*2*C + 4096})`, params: '', cls: '' },
+    { name: 'Dense(7) + Softmax', shape: 'Output: (B, 7)', params: totalParams + ' total params', cls: 'highlight' },
+  ];
+
+  const container = document.getElementById('archFlow');
+  container.innerHTML = blocks.map((b, i) => `
+    <div class="arch-block ${b.cls}">
+      <div>
+        <div class="arch-name">${b.name}</div>
+        <div class="arch-shape">${b.shape}</div>
+      </div>
+      ${b.params ? `<div class="arch-params">${b.params}</div>` : ''}
+    </div>
+    ${i < blocks.length - 1 ? '<div class="arch-arrow">↓</div>' : ''}
+  `).join('');
+}
+
+// ══════════════ DATASET TAB ══════════════
+async function loadDataset() {
+  try {
+    const [clsRes, distRes] = await Promise.all([fetch('/api/classes'), fetch('/api/distribution')]);
+    const clsData = await clsRes.json();
+    const distData = await distRes.json();
+    renderDistribution(distData, clsData);
+  } catch (e) { }
+}
+
+function renderDistribution(distData, clsData) {
+  const container = document.getElementById('distributionChart');
+  const maxCount = Math.max(...distData.distribution.map(d => d.count));
+  const clsMap = {};
+  clsData.classes.forEach(c => clsMap[c.id] = c);
+
+  container.innerHTML = distData.distribution.map(item => {
+    const cls = clsMap[item.class] || {};
+    const pct = (item.count / maxCount * 100);
+    const color = cls.color || '#666';
+    return `
+      <div class="dist-bar-row">
+        <div class="dist-class" style="color:${color}">${item.class.toUpperCase()}</div>
+        <div class="dist-bar-container">
+          <div class="dist-bar-fill" style="width:${pct}%;background:${color}">${item.percentage}%</div>
+        </div>
+        <div class="dist-count">${item.count.toLocaleString()} imgs</div>
+      </div>`;
+  }).join('');
+}
+
+// ══════════════ INIT ══════════════
+document.addEventListener('DOMContentLoaded', async () => {
+  try {
+    const res = await fetch('/api/health');
+    const data = await res.json();
+    if (!data.model_loaded) showToast('Note: Model weights not loaded (untrained). Predictions are random.', 'info', 7000);
+  } catch (e) {
+    showToast('⚠️ Could not connect to backend server', 'error', 10000);
+  }
+});
+</script>
+</body>
+</html>
